@@ -380,12 +380,16 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   gap: 10px;
 }
-.overline-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--bronze);
-  border-radius: 50%;
-  display: inline-block;
+/* Hide decorative overline/kicker dots site-wide (keeps layout intact) */
+.overline-dot,
+.kicker::before,
+.particle,
+.bv-field-packet {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Cards */
