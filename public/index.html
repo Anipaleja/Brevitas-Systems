@@ -606,6 +606,16 @@ function GlassmorphicWaitlistForm({ source = 'landing-final' }) {
 
 function LandingPage() {
   useFadeUpReveal();
+  const [heroVariant, setHeroVariant] = useState(() => {
+    try {
+      return localStorage.getItem('heroVariant') || (Math.random() < 0.5 ? 'a' : 'b');
+    } catch (e) { return 'a'; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('heroVariant', heroVariant); } catch (e) {}
+  }, [heroVariant]);
+
   return (
     <>
       <Nav />
@@ -613,7 +623,14 @@ function LandingPage() {
       {/* S1 — Hero */}
       <section className="section" style={{ paddingTop: 'clamp(72px, 10vh, 140px)', paddingBottom: 'clamp(72px, 10vh, 140px)' }}>
         <div className="container">
-          <Overline dot>INFRASTRUCTURE LAYER FOR MULTI-AGENT PIPELINES</Overline>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20 }}>
+            <Overline dot>INFRASTRUCTURE LAYER FOR MULTI-AGENT PIPELINES</Overline>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="t-mono" style={{ color: 'var(--stone)', fontSize: 12 }}>Hero variant: <strong style={{ marginLeft: 6 }}>{heroVariant.toUpperCase()}</strong></div>
+              <button onClick={() => setHeroVariant(v => v === 'a' ? 'b' : 'a')} style={{ border: '1px solid var(--line)', background: 'transparent', color: 'var(--stone-2)', padding: '6px 8px', borderRadius: 4 }}>Toggle</button>
+            </div>
+          </div>
+
           <h1 className="t-display-xl fade-up in" style={{ marginTop: 32, marginBottom: 32, maxWidth: 1100 }}>
             The communication layer <em style={{ fontStyle: 'italic', color: 'var(--bronze)' }}>between</em> your agents.
           </h1>
@@ -621,8 +638,17 @@ function LandingPage() {
             Multi-agent pipelines lose 60% of their tokens to redundant inter-agent context. Brevitas gives it back — as a drop-in Python SDK, without touching your agents, prompts, or models.
           </p>
           <div className="fade-up delay-2 in" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 64, alignItems: 'center' }}>
-            <Button variant="primary" href="/waitlist">Join the waitlist</Button>
-            <Button variant="ghost" href="/benchmarks">See the benchmarks</Button>
+            {heroVariant === 'a' ? (
+              <>
+                <Button variant="primary" href="/waitlist">Join the waitlist</Button>
+                <Button variant="ghost" href="/benchmarks">See the benchmarks</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="primary" href="/benchmarks">See the benchmarks</Button>
+                <Button variant="ghost" href="/waitlist">Join the waitlist</Button>
+              </>
+            )}
           </div>
           <div className="fade-up delay-3 in" style={{
             display: 'flex', gap: 'clamp(32px, 6vw, 80px)', flexWrap: 'wrap',
