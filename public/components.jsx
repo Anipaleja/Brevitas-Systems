@@ -535,17 +535,17 @@ function Nav({ current }) {
   }, []);
 
   const links = [
-    { href: 'product.html', label: 'Product', k: 'product' },
-    { href: 'how-it-works.html', label: 'How it works', k: 'how' },
-    { href: 'benchmarks.html', label: 'Benchmarks', k: 'benchmarks' },
-    { href: 'docs.html', label: 'Docs', k: 'docs' },
-    { href: 'blog.html', label: 'Blog', k: 'blog' },
+    { href: '/product', label: 'Product', k: 'product' },
+    { href: '/how-it-works', label: 'How it works', k: 'how' },
+    { href: '/benchmarks', label: 'Benchmarks', k: 'benchmarks' },
+    { href: '/docs', label: 'Docs', k: 'docs' },
+    { href: '/blog', label: 'Blog', k: 'blog' },
   ];
   return (
     <>
       <nav className={`nav ${scrolled ? 'scrolled' : ''}`} aria-label="Primary">
         <div className="nav-inner">
-          <a href="index.html" style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--fg)' }}>
+          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--fg)' }}>
             <span className="serif" style={{ fontSize: 18, letterSpacing: '-0.01em' }}>Brevitas</span>
           </a>
           <div className="nav-links desktop">
@@ -554,7 +554,7 @@ function Nav({ current }) {
             ))}
           </div>
           <ThemeToggle />
-          <Button variant="primary" href="waitlist.html" className="nav-cta">Join waitlist</Button>
+          <Button variant="primary" href="/waitlist" className="nav-cta">Join waitlist</Button>
           <button className="nav-hamburger" onClick={() => setSheet(true)} aria-label="Menu">
             <span/><span/><span/>
           </button>
@@ -565,7 +565,7 @@ function Nav({ current }) {
           <button className="nav-sheet-close" onClick={() => setSheet(false)} aria-label="Close">×</button>
           <div className="nav-sheet-links">
             {links.map(l => <a key={l.k} href={l.href}>{l.label}</a>)}
-            <a href="waitlist.html" style={{ color: 'var(--bronze)' }}>Join waitlist →</a>
+            <a href="/waitlist" style={{ color: 'var(--bronze)' }}>Join waitlist →</a>
           </div>
         </div>
       )}
@@ -589,19 +589,19 @@ function Footer() {
           <div>
             <h4>Product</h4>
             <ul>
-              <li><a href="product.html">Product</a></li>
-              <li><a href="how-it-works.html">How it works</a></li>
-              <li><a href="benchmarks.html">Benchmarks</a></li>
-              <li><a href="docs.html">Docs</a></li>
-              <li><a href="docs.html">Changelog</a></li>
+              <li><a href="/product">Product</a></li>
+              <li><a href="/how-it-works">How it works</a></li>
+              <li><a href="/benchmarks">Benchmarks</a></li>
+              <li><a href="/docs">Docs</a></li>
+              <li><a href="/docs">Changelog</a></li>
             </ul>
           </div>
           <div>
             <h4>Company</h4>
             <ul>
-              <li><a href="blog.html">Blog</a></li>
+              <li><a href="/blog">Blog</a></li>
               <li><a href="mailto:james@brevitas.systems">Contact</a></li>
-              <li><a href="waitlist.html">Waitlist</a></li>
+              <li><a href="/waitlist">Waitlist</a></li>
             </ul>
           </div>
           <div>

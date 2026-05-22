@@ -522,7 +522,7 @@ function ThesisSequence() {
         transition: 'opacity 500ms',
         marginTop: 24,
       }}>
-        <a href="how-it-works.html" className="btn btn-secondary">
+        <a href="/how-it-works" className="btn btn-secondary">
           See how <span className="arrow">→</span>
         </a>
       </div>
