@@ -41,6 +41,7 @@ class RouteDecision:
     est_cost_retrieve: float
     repeat_rate: float            # 0..1 how often this session's context has repeated
     provider_cache_discount: float
+    write_cache: bool = False     # safe to pay a cache WRITE? only once a prefix repeats
 
 
 @dataclass
@@ -75,27 +76,34 @@ class BrevitasRouter:
         st.obs_hit = hit if st.obs_hit < 0 else 0.5 * st.obs_hit + 0.5 * hit
         st.obs_count += 1
 
-    def _observe(self, session_id: str, stable_context: Sequence[str]) -> float:
-        """Update repeat tracking; return this session's running repeat rate."""
+    def _observe(self, session_id: str, stable_context: Sequence[str]) -> tuple[float, bool]:
+        """Update repeat tracking; return (running repeat rate, did-this-prefix-just-repeat)."""
         st = self._sessions.setdefault(session_id, _SessionState())
         h = hashlib.sha256("".join(stable_context).encode("utf-8")).hexdigest()
+        repeated_now = bool(st.last_prefix_hash) and h == st.last_prefix_hash
         st.calls += 1
-        if h == st.last_prefix_hash:
+        if repeated_now:
             st.repeats += 1
         st.last_prefix_hash = h
-        return st.repeats / max(1, st.calls - 1) if st.calls > 1 else 0.0
+        rate = st.repeats / max(1, st.calls - 1) if st.calls > 1 else 0.0
+        return rate, repeated_now
 
     def decide(self, session_id: str, stable_context: Sequence[str],
                volatile_query: str = "") -> RouteDecision:
         """Choose the cheapest strategy for this request."""
         ctx_tokens = sum(count_tokens(c) for c in stable_context)
         q_tokens = count_tokens(volatile_query)
-        repeat_rate = self._observe(session_id, stable_context)
+        repeat_rate, _ = self._observe(session_id, stable_context)
         disc = self._discount()
+
+        # A cache WRITE only pays off if a read follows. Only authorise writes once
+        # this session's prefix has actually repeated, so a one-off / test-project
+        # call never eats a (write-premium) cache write for context that never recurs.
+        write_cache = self._sessions[session_id].repeats > 0
 
         if ctx_tokens < MIN_CACHEABLE:
             return RouteDecision("passthrough", "context below cacheable minimum",
-                                 0.0, 0.0, repeat_rate, disc)
+                                 0.0, 0.0, repeat_rate, disc, write_cache=write_cache)
 
         st = self._sessions[session_id]
         # Effective cache multiplier for cache_only. If we have REAL observations of how much
@@ -116,4 +124,4 @@ class BrevitasRouter:
         else:
             strat, why = "cache_only", f"caching cheaper ({why_basis})"
         return RouteDecision(strat, why, round(cache_only, 1), round(retrieve, 1),
-                             round(repeat_rate, 3), disc)
+                             round(repeat_rate, 3), disc, write_cache=write_cache)

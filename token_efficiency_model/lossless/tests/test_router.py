@@ -70,6 +70,30 @@ def test_cache_feedback_keeps_cache_when_provider_delivers():
     assert d.strategy == "cache_only"
 
 
+def test_no_speculative_cache_write_on_first_sight():
+    """A prefix seen for the first time must NOT authorise a cache write — otherwise
+    a one-off / test-project Anthropic call pays the ~1.25x write premium for nothing."""
+    r = BrevitasRouter(provider="anthropic")
+    d = r.decide("sess", [_big()], "q")
+    assert d.write_cache is False
+
+
+def test_cache_write_authorised_only_after_repeat():
+    """Once the same prefix repeats, writing the cache is worthwhile (reads will follow)."""
+    r = BrevitasRouter(provider="anthropic")
+    ctx = [_big()]
+    assert r.decide("sess", ctx, "q").write_cache is False   # first sight
+    assert r.decide("sess", ctx, "q").write_cache is True    # proven repeat
+
+
+def test_varying_prefix_never_authorises_write():
+    """Context that changes every call must never trigger a (premium) cache write."""
+    r = BrevitasRouter(provider="anthropic")
+    for i in range(5):
+        d = r.decide("sess", [_big() + f" unique-{i}"], "q")
+        assert d.write_cache is False
+
+
 def test_cost_estimates_present_and_ordered():
     r = BrevitasRouter(provider="deepseek")
     ctx = [_big()]

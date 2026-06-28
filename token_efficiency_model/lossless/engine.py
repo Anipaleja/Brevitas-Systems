@@ -63,15 +63,23 @@ def optimize_request(body: dict, provider: str, router: BrevitasRouter,
                     "kept": len(new_msgs), "of": len(messages),
                     "baseline_tokens": sel["baseline_tokens"],
                     "optimized_tokens": sel["optimized_tokens"]}
-        strategy = "cache_only"  # retrieval bailed -> safe fall-through to caching
+        # retrieval bailed (e.g. encoder unavailable). DON'T force a cache write —
+        # only fall through to caching if the router has authorised a write.
+        strategy = "cache_only" if decision.write_cache else "passthrough"
 
-    # cache_only / passthrough
-    if provider == "anthropic" and strategy != "passthrough":
+    # cache_only / passthrough.
+    # Anthropic cache WRITES cost ~1.25x input and only pay off once a read follows.
+    # Only inject cache_control after the prefix has proven to repeat (write_cache),
+    # so a one-off / non-repeating call is never made MORE expensive than baseline.
+    if provider == "anthropic" and strategy == "cache_only" and decision.write_cache:
         plan = apply_anthropic_cache(body)   # inject cache_control breakpoints
         return {"strategy": "cache_only", "reason": decision.reason,
                 "cache_breakpoints": plan.breakpoints,
                 "cached_prefix_tokens": plan.cached_prefix_tokens}
     # OpenAI/DeepSeek: caching is automatic if prefix is byte-identical — we DON'T mutate it.
+    # Anthropic without a proven repeat: passthrough (body untouched = baseline cost).
+    if provider == "anthropic" and not decision.write_cache:
+        return {"strategy": "passthrough", "reason": decision.reason}
     return {"strategy": strategy, "reason": decision.reason}
 
 
