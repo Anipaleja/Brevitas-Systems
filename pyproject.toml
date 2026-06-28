@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brevitas-systems"
-version = "0.4.0"
+version = "0.6.1"
 description = "Lossless token savings + per-pipeline/agent tracking between your agents and the model."
 readme = "README.md"
 license = { text = "Proprietary" }
@@ -26,9 +26,10 @@ dependencies = [
 # retrieval fail-safes to full context / caching when the encoder is unavailable.
 retrieval = ["sentence-transformers>=2.2.0"]
 promptopt = ["llmlingua>=0.2.1"]
+pdf = ["pymupdf>=1.23.0"]
 anthropic = ["anthropic>=0.28.0"]
 openai    = ["openai>=1.30.0"]
-all       = ["sentence-transformers>=2.2.0", "llmlingua>=0.2.1", "anthropic>=0.28.0", "openai>=1.30.0"]
+all       = ["sentence-transformers>=2.2.0", "llmlingua>=0.2.1", "anthropic>=0.28.0", "openai>=1.30.0", "pymupdf>=1.23.0"]
 
 [project.scripts]
 brevitas = "brevitas.cli:main"

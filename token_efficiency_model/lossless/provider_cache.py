@@ -158,6 +158,9 @@ def _mark_tools(body: dict) -> bool:
 # relative input-token prices (cost units); output excluded (savings is input-side)
 _ANTHROPIC = {"input": 1.0, "cache_write": 1.25, "cache_read": 0.10}
 _OPENAI = {"input": 1.0, "cache_read": 0.50}
+# cached-token discount as a fraction of fresh input price, per provider (from provider docs).
+# DeepSeek caches at ~10% of input price (90% off); OpenAI ~50%.
+_CACHE_READ = {"openai": 0.50, "deepseek": 0.10, "groq": 1.00}
 
 
 @dataclass
@@ -182,12 +185,14 @@ def savings_from_usage(usage: dict, provider: str) -> Savings:
                   + read * _ANTHROPIC["cache_read"])
         cached = read
         detail = {"input": fresh, "cache_write": write, "cache_read": read}
-    else:  # openai / deepseek style
+    else:  # openai / deepseek style — use the PROVIDER'S real cache discount
         prompt = int(usage.get("prompt_tokens", 0))
-        cached = int(usage.get("prompt_tokens_details", {}).get("cached_tokens", 0))
+        details = usage.get("prompt_tokens_details", {}) or {}
+        cached = int(details.get("cached_tokens", 0) or usage.get("prompt_cache_hit_tokens", 0))
         fresh = prompt - cached
-        uncached = prompt * _OPENAI["input"]
-        actual = fresh * _OPENAI["input"] + cached * _OPENAI["cache_read"]
-        detail = {"prompt": prompt, "cached": cached}
+        cache_read = _CACHE_READ.get(provider.lower(), 0.50)
+        uncached = prompt * 1.0
+        actual = fresh * 1.0 + cached * cache_read
+        detail = {"prompt": prompt, "cached": cached, "cache_read_rate": cache_read}
     savings_pct = round(100 * (1 - actual / uncached), 2) if uncached > 0 else 0.0
     return Savings(round(uncached, 2), round(actual, 2), savings_pct, cached, detail)
