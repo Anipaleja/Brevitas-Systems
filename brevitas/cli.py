@@ -165,3 +165,98 @@ def status(api_key: str, base_url: str) -> None:
             _print(f"[red]✗ Stats check failed: {e}[/red]")
     else:
         _print("[dim]No API key set — set BREVITAS_API_KEY to check usage[/dim]")
+
+
+@main.command()
+@click.argument("prompt", required=False)
+@click.option("--file", "-f", "path", default="", help="Read the prompt from a file.")
+@click.option("--task", "-t", default="", help="Task hint: creative|code|summarize|reasoning|extraction (else auto-detected).")
+@click.option("--rate", "-r", type=float, default=None, help="Force a fixed keep-rate (0.1-1.0). Default: smart per-task.")
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of a summary.")
+def optimize(prompt: str, path: str, task: str, rate, as_json: bool) -> None:
+    """Shrink a single prompt's tokens (smart, task-aware). Reads PROMPT, --file, or stdin.
+
+    Examples:
+        brevitas optimize "Make me a marketing reel for our oak table"
+        cat prompt.txt | brevitas optimize
+        brevitas optimize -f prompt.txt --task code
+    """
+    import json as _json
+    if path:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    elif prompt:
+        text = prompt
+    elif not sys.stdin.isatty():
+        text = sys.stdin.read()
+    else:
+        _print("[red]No prompt given.[/red] Pass it as an argument, with -f FILE, or pipe via stdin.")
+        sys.exit(1)
+
+    if rate is not None:
+        from token_efficiency_model.lossless.prompt_optimizer import optimize_prompt as _opt
+        r = _opt(text, rate=rate)
+        task_name, used_rate = None, rate
+        optimized, tb, ta, sp, method, lossy, note = (
+            r.optimized, r.tokens_before, r.tokens_after, r.saved_pct, r.method, r.lossy, r.note)
+    else:
+        from token_efficiency_model.lossless.task_router import TaskCompressionRouter
+        res = TaskCompressionRouter().route(text, task_hint=task or None)
+        o = res.optimization
+        task_name, used_rate = res.task, res.rate
+        optimized, tb, ta, sp, method, lossy, note = (
+            o.optimized, o.tokens_before, o.tokens_after, o.saved_pct, o.method, o.lossy, o.note)
+
+    if as_json:
+        click.echo(_json.dumps({
+            "task": task_name, "rate": used_rate, "tokens_before": tb, "tokens_after": ta,
+            "saved_pct": sp, "method": method, "lossy": lossy, "note": note,
+            "optimized_prompt": optimized,
+        }, indent=2))
+        return
+
+    _print(f"\n[bold]Task:[/bold] {task_name or 'fixed-rate'}   [bold]rate:[/bold] {used_rate}")
+    _print(f"[bold]Tokens:[/bold] {tb} -> {ta}   [green]{sp}% saved[/green]   "
+           f"[dim]({method}{', lossy' if lossy else ', lossless'})[/dim]")
+    if note:
+        _print(f"[dim]{note}[/dim]")
+    _print("\n[bold]Optimized prompt:[/bold]\n" + optimized)
+
+
+@main.command()
+@click.argument("path", default=".", required=False)
+@click.option("--json", "as_json", is_flag=True, help="Emit machine-readable JSON.")
+def analyze(path: str, as_json: bool) -> None:
+    """Scan ANY codebase for LLM API calls (SDK + raw HTTP) and recommend a per-call
+    strategy: optimize (compress simple/creative prompts) vs lossless (keep complex ones,
+    save via caching)."""
+    from .scanner.broad import analyze_path
+    rep = analyze_path(path)
+
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps({
+            "files_scanned": rep.files_scanned,
+            "optimize": len(rep.optimize), "lossless": len(rep.lossless),
+            "calls": [{
+                "location": c.location, "provider": c.provider, "transport": c.transport,
+                "task": c.task, "complexity": c.complexity, "strategy": c.strategy.value,
+                "prompt_excerpt": c.prompt_excerpt, "reason": c.reason,
+            } for c in rep.calls],
+        }, indent=2))
+        return
+
+    if not rep.calls:
+        _print(f"[dim]Scanned {rep.files_scanned} files — no LLM API calls found.[/dim]")
+        return
+    _print(f"\n[bold]{len(rep.calls)}[/bold] LLM API call(s) across {rep.files_scanned} files:\n")
+    for c in rep.calls:
+        color = "yellow" if c.strategy.value == "optimize" else ("green" if c.strategy.value == "lossless" else "dim")
+        _print(f"  [cyan]{c.location}[/cyan]  {c.provider}/{c.transport}  "
+               f"[{color}]{c.strategy.value.upper()}[/{color}]  [dim]{c.reason}[/dim]")
+    _print(f"\n[bold]Recommend[/bold]: [yellow]{len(rep.optimize)} OPTIMIZE[/yellow] "
+           f"(compress) · [green]{len(rep.lossless)} LOSSLESS[/green] (keep + cache)")
+
+
+if __name__ == "__main__":
+    main()

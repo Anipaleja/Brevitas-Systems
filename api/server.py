@@ -357,6 +357,54 @@ class RetrievalCompressRequest(BaseModel):
     min_top_score:     float     = Field(default=0.2, ge=0.0, le=1.0)
 
 
+class OptimizePromptRequest(BaseModel):
+    prompt: str             = Field(max_length=200_000)
+    rate:   Optional[float] = Field(default=None, ge=0.1, le=1.0)  # None=auto by task
+    task:   Optional[str]   = Field(default=None, max_length=40)   # hint: creative/code/...
+    smart:  bool            = Field(default=True)  # task-aware router (vs fixed rate)
+
+
+@app.post("/v1/optimize-prompt")
+@limiter.limit("120/minute")
+def optimize_prompt_endpoint(request: Request, body: OptimizePromptRequest,
+                             kh: str = Depends(_authenticated)):
+    """Shrink a SINGLE prompt's tokens.
+
+    smart=True (default): a task-aware router classifies the prompt (creative/code/reasoning/
+    extraction/...) and picks a safe LLMLingua-2 compression rate — aggressive on creative/
+    boilerplate, light on precise tasks — while protecting code blocks + key tokens.
+    smart=False or explicit `rate`: use that fixed rate (1.0=lossless). Lossy when rate<1.0
+    (LLMLingua-2, arXiv:2403.12968); fail-safe to lossless without the [promptopt] extra.
+    Tokens measured with tiktoken."""
+    if body.smart and body.rate is None:
+        from token_efficiency_model.lossless.task_router import TaskCompressionRouter
+        res = TaskCompressionRouter().route(body.prompt, task_hint=body.task)
+        r = res.optimization
+        extra = {"task": res.task, "rate": res.rate, "protected_code_blocks": res.protected_code_blocks}
+    else:
+        from token_efficiency_model.lossless.prompt_optimizer import optimize_prompt as _opt
+        r = _opt(body.prompt, rate=body.rate if body.rate is not None else 1.0)
+        extra = {"task": None, "rate": body.rate}
+
+    _store.record_usage(
+        key_hash=kh,
+        baseline_tokens=r.tokens_before,
+        optimized_tokens=r.tokens_after,
+        savings_pct=r.saved_pct,
+        quality_proxy=None,
+    )
+    return {
+        "optimized_prompt": r.optimized,
+        "tokens_before": r.tokens_before,
+        "tokens_after": r.tokens_after,
+        "saved_pct": r.saved_pct,
+        "method": r.method,
+        "lossy": r.lossy,
+        "note": r.note,
+        **extra,
+    }
+
+
 @app.post("/v1/compress/retrieval")
 @limiter.limit("60/minute")
 def compress_retrieval(request: Request, body: RetrievalCompressRequest,

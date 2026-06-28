@@ -36,6 +36,8 @@ from .config import configure, get as get_config
 from .session import BrevitasSession
 from .labels import start_run, agent, get_pipeline, get_agent, get_run_id, resolve_labels
 from token_efficiency_model.lossless import BrevitasClient, SavingsReport, BrevitasRouter
+from token_efficiency_model.lossless import optimize_prompt, PromptOptimization
+from token_efficiency_model.lossless import TaskCompressionRouter, classify_task
 
 
 def wrap(client, session: BrevitasSession | None = None):
@@ -67,5 +69,6 @@ def wrap(client, session: BrevitasSession | None = None):
 
 __all__ = ["BrevitasClient", "SavingsReport", "BrevitasRouter",
            "configure", "get_config", "wrap", "BrevitasSession",
-           "start_run", "agent", "get_pipeline", "get_agent", "get_run_id", "resolve_labels"]
-__version__ = "0.2.0"
+           "start_run", "agent", "get_pipeline", "get_agent", "get_run_id", "resolve_labels",
+           "optimize_prompt", "PromptOptimization", "TaskCompressionRouter", "classify_task"]
+__version__ = "0.4.0"

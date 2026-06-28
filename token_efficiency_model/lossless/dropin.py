@@ -171,6 +171,12 @@ class BrevitasDropIn:
         )
         return response, report
 
+    def optimize_prompt(self, text: str, rate: float = 1.0):
+        """Shrink a single prompt's tokens (lossless normalization; rate<1.0 = LLMLingua-2,
+        lossy, needs the [promptopt] extra). Returns a PromptOptimization with token counts."""
+        from .prompt_optimizer import optimize_prompt as _opt
+        return _opt(text, rate=rate)
+
     def _extract_usage(self, response: Any, provider: str) -> dict:
         """Extract usage info from provider response."""
         if provider == "anthropic":

@@ -16,6 +16,13 @@ class Recommendation(str, Enum):
     DONE = "done"      # already routed through Brevitas
 
 
+class Strategy(str, Enum):
+    """Per-call recommendation: how should Brevitas save tokens on THIS call?"""
+    OPTIMIZE = "optimize"   # simple/creative prompt -> compress it (LLMLingua-2)
+    LOSSLESS = "lossless"   # complex/precise prompt -> keep full, save via caching/retrieval
+    UNKNOWN = "unknown"     # couldn't read the prompt text to classify
+
+
 @dataclass
 class Finding:
     path: str
