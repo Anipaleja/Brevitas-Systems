@@ -37,12 +37,22 @@ def test_creative_rate_more_aggressive_than_reasoning():
 
 
 # --- token protection ("retain as much context as possible") --------------- #
-def test_protect_tokens_includes_identifiers_and_numbers():
+def test_protect_tokens_code_task_protects_identifiers_and_numbers():
     prompt = "Build a function calculateTotal that returns 42.50 for user_id 1001"
-    prot = _protect_tokens(prompt)
+    prot = _protect_tokens(prompt, "code")
     assert "calculateTotal" in prot
     assert "user_id" in prot
     assert "42.50" in prot or "42" in " ".join(prot)
+
+
+def test_protect_tokens_prose_task_does_not_over_protect_words():
+    """Regression: protecting every word defeats compression. Prose tasks should only
+    pin numbers + structural punctuation, leaving ordinary words compressible."""
+    prompt = "Write a punchy sustainable marketing tagline for our oak table costing 499 dollars"
+    prot = _protect_tokens(prompt, "creative")
+    assert "marketing" not in prot          # ordinary words are NOT force-kept
+    assert "sustainable" not in prot
+    assert "499" in prot                     # numbers still load-bearing
 
 
 # --- router behavior + fail-safe ------------------------------------------- #

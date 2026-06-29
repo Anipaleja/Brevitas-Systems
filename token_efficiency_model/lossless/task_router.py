@@ -69,15 +69,21 @@ def classify_task(prompt: str, hint: Optional[str] = None) -> str:
     return "general"
 
 
-def _protect_tokens(prompt: str) -> List[str]:
-    """Tokens LLMLingua-2 must never drop: identifiers, numbers, structural punctuation.
-    This is how we 'retain as much context as possible' for code/precise tasks."""
-    base = ["\n", ".", "!", "?", ",", ":", ";", "(", ")", "{", "}", "[", "]", "=", "-"]
-    # protect code-ish identifiers and numbers actually present in the prompt
-    idents = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]{2,}", prompt))
+def _protect_tokens(prompt: str, task: str = "general") -> List[str]:
+    """Tokens LLMLingua-2 must never drop. Kept deliberately MINIMAL for prose tasks so the
+    compressor can actually do its job — over-protecting (e.g. every word) defeats compression.
+
+    Always: structural punctuation + numbers (load-bearing). For precise/code tasks we also
+    protect code-ish identifiers (dotted paths, snake_case, camelCase) so logic survives."""
+    base = ["\n", ".", "!", "?", ",", ":", ";", "(", ")", "{", "}", "[", "]", "=", "-", "%", "$"]
     nums = set(re.findall(r"\b\d[\d.,]*\b", prompt))
-    # cap to keep the force list reasonable
-    return base + list(idents)[:200] + list(nums)[:50]
+    protect = base + list(nums)[:80]
+    if task in ("code", "extraction", "reasoning"):
+        dotted = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*(?:[._][A-Za-z0-9_]+)+\b", prompt))
+        camel = set(re.findall(r"\b[a-z]+[A-Z][A-Za-z0-9]*\b", prompt))
+        snake = set(re.findall(r"\b[A-Za-z]+_[A-Za-z0-9_]+\b", prompt))
+        protect += list(dotted)[:120] + list(camel)[:60] + list(snake)[:60]
+    return protect
 
 
 @dataclass
@@ -113,14 +119,14 @@ class TaskCompressionRouter:
             return TaskCompressionResult(task, rate, opt, code_blocks)
 
         before = count_tokens(prompt)
-        force = _protect_tokens(prompt)
+        force = _protect_tokens(prompt, task)
         out_parts: List[str] = []
         for i, seg in enumerate(segments):
             if i % 2 == 1:                       # code fence
                 out_parts.append(seg if self.protect_code else seg)
                 continue
             seg_norm = normalize_prompt(seg)
-            if count_tokens(seg_norm) < 40:      # too short to compress meaningfully
+            if count_tokens(seg_norm) < 12:      # genuinely too short to compress safely
                 out_parts.append(seg_norm)
                 continue
             try:

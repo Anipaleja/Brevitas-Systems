@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from .._compress import report_usage
+from ..config import get as _bvt_cfg
 from ..labels import resolve_labels
 from ..session import BrevitasSession
 from token_efficiency_model.lossless.engine import optimize_request, record_usage
@@ -31,7 +32,8 @@ class _BrevitasMessages:
         sid = kwargs.pop("_brevitas_session", self._session.session_id)
         labels = resolve_labels(kwargs.pop("_brevitas_meta", None))
         body = {"messages": list(messages), "model": model, **kwargs}
-        optimize_request(body, _PROVIDER, self._router, sid)   # lossless, in-place
+        optimize_request(body, _PROVIDER, self._router, sid,
+                         optimize_prompts=_bvt_cfg().get("optimize_prompts", True))
         return body, sid, labels
 
     def create(self, *, messages: list[dict], model: str = "", **kwargs: Any) -> Any:
