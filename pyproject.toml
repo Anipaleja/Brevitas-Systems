@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brevitas-systems"
-version = "0.6.1"
+version = "0.7.0"
 description = "Lossless token savings + per-pipeline/agent tracking between your agents and the model."
 readme = "README.md"
 license = { text = "Proprietary" }

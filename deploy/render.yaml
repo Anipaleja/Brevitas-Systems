@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: brevitas-compress
+    runtime: docker
+    dockerfilePath: ./services/compress/Dockerfile
+    # build context = repo root (Render default); Dockerfile COPYs use services/compress/ paths
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: BREVITAS_COMPRESS_TOKEN
+        scope: run
+        sync: false
+    plan: standard
+    instanceCount: 1
+    disk:
+      size: 5GB
+    memoryLimit: 2048
+    cpuLimit: 1

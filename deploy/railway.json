@@ -1,0 +1,30 @@
+{
+  "name": "brevitas-compress",
+  "services": [
+    {
+      "name": "compress",
+      "source": {
+        "type": "docker",
+        "dockerfile": "services/compress/Dockerfile"
+      },
+      "variables": {
+        "BREVITAS_COMPRESS_TOKEN": {
+          "description": "Optional authentication token for compression service",
+          "value": ""
+        }
+      },
+      "port": 8080,
+      "healthCheck": {
+        "path": "/health",
+        "timeout": 10
+      },
+      "resources": {
+        "cpu": "1000m",
+        "memoryMB": 2048
+      },
+      "startCommand": "uvicorn app:app --host 0.0.0.0 --port 8080"
+    }
+  ],
+  "volumeNames": {},
+  "projectName": "brevitas-compress"
+}

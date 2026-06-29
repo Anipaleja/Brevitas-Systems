@@ -71,4 +71,4 @@ __all__ = ["BrevitasClient", "SavingsReport", "BrevitasRouter",
            "configure", "get_config", "wrap", "BrevitasSession",
            "start_run", "agent", "get_pipeline", "get_agent", "get_run_id", "resolve_labels",
            "optimize_prompt", "PromptOptimization", "TaskCompressionRouter", "classify_task"]
-__version__ = "0.6.1"
+__version__ = "0.7.0"

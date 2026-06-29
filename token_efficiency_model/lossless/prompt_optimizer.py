@@ -87,7 +87,7 @@ def optimize_prompt(text: str, rate: float = 1.0,
         text: the prompt to shrink.
         rate: target keep-ratio. 1.0 = lossless normalization only (safe, default). A value
             < 1.0 (e.g. 0.5 keeps ~half) enables LLMLingua-2 compression (LOSSY). Requires the
-            `[promptopt]` extra; falls back to lossless-only with a note if unavailable.
+            `[promptopt]` extra; falls back to remote service if configured, then to lossless-only.
         force_tokens: tokens LLMLingua-2 must never drop (e.g. ["\n", ".", "?"]).
 
     Returns a PromptOptimization with before/after token counts measured by tiktoken.
@@ -105,33 +105,41 @@ def optimize_prompt(text: str, rate: float = 1.0,
 
     # rate < 1.0 -> LLMLingua-2 (lossy, opt-in)
     comp = _get_llmlingua()
-    if comp is None:
-        after = count_tokens(normalized)
-        return PromptOptimization(
-            original=text, optimized=normalized, tokens_before=before, tokens_after=after,
-            saved_pct=round(100 * (1 - after / max(1, before)), 2),
-            method="lossless", lossy=False,
-            note="LLMLingua-2 unavailable (install brevitas-systems[promptopt]); used lossless only.",
-        )
-    try:
-        result = comp.compress_prompt(
-            normalized, rate=rate,
-            force_tokens=force_tokens or ["\n", ".", "!", "?", ",", ":"],
-        )
-        compressed = result.get("compressed_prompt", normalized)
-    except Exception as e:
-        after = count_tokens(normalized)
-        return PromptOptimization(
-            original=text, optimized=normalized, tokens_before=before, tokens_after=after,
-            saved_pct=round(100 * (1 - after / max(1, before)), 2),
-            method="lossless", lossy=False,
-            note=f"LLMLingua-2 failed ({type(e).__name__}); used lossless only.",
-        )
+    if comp is not None:
+        try:
+            result = comp.compress_prompt(
+                normalized, rate=rate,
+                force_tokens=force_tokens or ["\n", ".", "!", "?", ",", ":"],
+            )
+            compressed = result.get("compressed_prompt", normalized)
+            after = count_tokens(compressed)
+            return PromptOptimization(
+                original=text, optimized=compressed, tokens_before=before, tokens_after=after,
+                saved_pct=round(100 * (1 - after / max(1, before)), 2),
+                method="llmlingua2+lossless", lossy=True,
+                note="LLMLingua-2 (arXiv:2403.12968) — lossy compression; verify output on critical prompts.",
+            )
+        except Exception as e:
+            pass  # Fall through to remote/lossless
 
-    after = count_tokens(compressed)
+    # Local LLMLingua unavailable or failed; try remote service next
+    from . import remote_compress
+    if remote_compress.remote_available():
+        remote_result = remote_compress.remote_optimize(
+            normalized, rate=rate, force_tokens=force_tokens
+        )
+        if remote_result is not None:
+            return remote_result
+
+    # All compressions unavailable or failed; fall back to lossless
+    after = count_tokens(normalized)
+    note = "LLMLingua-2 unavailable (install brevitas-systems[promptopt]); used lossless only."
+    if remote_compress.remote_available():
+        note = "Remote and local LLMLingua-2 unavailable; used lossless only."
+
     return PromptOptimization(
-        original=text, optimized=compressed, tokens_before=before, tokens_after=after,
+        original=text, optimized=normalized, tokens_before=before, tokens_after=after,
         saved_pct=round(100 * (1 - after / max(1, before)), 2),
-        method="llmlingua2+lossless", lossy=True,
-        note="LLMLingua-2 (arXiv:2403.12968) — lossy compression; verify output on critical prompts.",
+        method="lossless", lossy=False,
+        note=note,
     )

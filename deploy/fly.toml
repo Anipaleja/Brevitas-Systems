@@ -1,0 +1,31 @@
+app = "brevitas-compress"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "services/compress/Dockerfile"
+
+[env]
+  BREVITAS_COMPRESS_TOKEN = ""
+
+[http_service]
+  internal_port = 8080
+  force_https = false
+  auto_start_machines = true
+  auto_stop_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 2048
+
+[checks]
+  [checks.http]
+    grace_period = "40s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+    restart_limit = 3
+    timeout = "10s"
