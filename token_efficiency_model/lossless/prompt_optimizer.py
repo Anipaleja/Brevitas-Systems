@@ -63,17 +63,36 @@ _LLMLINGUA = None
 _LLMLINGUA_TRIED = False
 
 
+def _pick_device() -> str:
+    """Best available torch device. llmlingua defaults to CUDA and crashes on CPU-only
+    machines (most Macs/laptops), so detect explicitly: cuda > mps (Apple) > cpu."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            return "mps"
+    except Exception:
+        pass
+    return "cpu"
+
+
 def _get_llmlingua():
     global _LLMLINGUA, _LLMLINGUA_TRIED
     if _LLMLINGUA_TRIED:
         return _LLMLINGUA
     _LLMLINGUA_TRIED = True
+    model = "microsoft/llmlingua-2-xlm-roberta-large-meetingbank"
     try:
         from llmlingua import PromptCompressor
-        _LLMLINGUA = PromptCompressor(
-            model_name="microsoft/llmlingua-2-xlm-roberta-large-meetingbank",
-            use_llmlingua2=True,
-        )
+        device = _pick_device()
+        try:
+            _LLMLINGUA = PromptCompressor(model_name=model, use_llmlingua2=True,
+                                          device_map=device)
+        except Exception:
+            # Some ops are flaky on mps; CPU always works — retry once before giving up.
+            _LLMLINGUA = PromptCompressor(model_name=model, use_llmlingua2=True,
+                                          device_map="cpu")
     except Exception:
         _LLMLINGUA = None
     return _LLMLINGUA

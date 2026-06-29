@@ -63,12 +63,51 @@ def test_varying_prefix_never_mutated():
         assert _cache_injected(body) is False
 
 
-def test_openai_body_never_mutated():
-    """OpenAI caching is server-side; the engine must not touch the request body."""
+def test_openai_stable_prefix_never_mutated():
+    """OpenAI caching is server-side and prefix-based; the engine must leave the stable
+    prefix byte-identical (only the volatile last message may be optimized)."""
     r = BrevitasRouter(provider="openai")
-    body = _fresh_body()
-    body.pop("system")
-    body["messages"] = [{"role": "user", "content": _big_system()}]
-    before = [dict(m) for m in body["messages"]]
+    prefix = [
+        {"role": "system", "content": _big_system()},
+        {"role": "assistant", "content": "ok"},
+    ]
+    body = {"model": "gpt-4o", "messages": [dict(m) for m in prefix]
+            + [{"role": "user", "content": "hi"}]}
     optimize_request(body, "openai", r, "s")
-    assert body["messages"] == before
+    assert body["messages"][:2] == prefix  # prefix untouched
+
+
+def test_small_task_is_optimized_when_enabled():
+    """A SMALL, one-shot prompt (below the cacheable minimum) still gets the prompt lever.
+    With no [promptopt] extra this is lossless normalization — collapsing redundant
+    whitespace — which the caching/retrieval levers would never touch."""
+    r = BrevitasRouter(provider="openai")
+    messy = "Write    a   haiku   about   the   ocean.\n\n\n\nMake it calm."
+    body = {"model": "gpt-4o", "messages": [{"role": "user", "content": messy}]}
+    meta = optimize_request(body, "openai", r, "s", optimize_prompts=True)
+    assert meta["prompt_optimized"] is True
+    assert "    " not in body["messages"][0]["content"]   # whitespace collapsed
+    assert body["messages"][0]["content"].count("\n\n\n") == 0
+
+
+def test_prompt_lever_can_be_disabled():
+    r = BrevitasRouter(provider="openai")
+    messy = "Write    a   haiku   about   the   ocean."
+    body = {"model": "gpt-4o", "messages": [{"role": "user", "content": messy}]}
+    meta = optimize_request(body, "openai", r, "s", optimize_prompts=False)
+    assert meta.get("prompt_optimized") in (None, False)
+    assert body["messages"][0]["content"] == messy   # untouched
+
+
+def test_prompt_lever_preserves_non_text_blocks():
+    """Image / non-text content blocks must survive prompt optimization."""
+    r = BrevitasRouter(provider="openai")
+    content = [
+        {"type": "text", "text": "Describe    this    image    in    detail please."},
+        {"type": "image_url", "image_url": {"url": "data:..."}},
+    ]
+    body = {"model": "gpt-4o", "messages": [{"role": "user", "content": content}]}
+    optimize_request(body, "openai", r, "s", optimize_prompts=True)
+    blocks = body["messages"][0]["content"]
+    assert any(b.get("type") == "image_url" for b in blocks)   # image kept
+    assert "    " not in blocks[0]["text"]                      # text optimized

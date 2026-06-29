@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from .._compress import report_usage
+from ..config import get as _bvt_cfg
 from ..labels import resolve_labels
 from ..session import BrevitasSession
 from token_efficiency_model.lossless.engine import optimize_request, record_usage
@@ -30,7 +31,8 @@ class _BrevitasCompletions:
         labels = resolve_labels(kwargs.pop("_brevitas_meta", None))  # pipeline/agent/run_id
         provider = "deepseek" if "deepseek" in (model or "").lower() else "openai"
         body = {"messages": list(messages), "model": model, **kwargs}
-        optimize_request(body, provider, self._router, sid)   # lossless, in-place
+        optimize_request(body, provider, self._router, sid,
+                         optimize_prompts=_bvt_cfg().get("optimize_prompts", True))
         response = self._orig.create(**body)
         try:
             text = response.choices[0].message.content or ""
